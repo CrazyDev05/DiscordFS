@@ -1,13 +1,11 @@
 package de.crazydev22.discordfs;
 
+import lombok.SneakyThrows;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.mariadb.jdbc.MariaDbDataSource;
 
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
 
 public class Database {
 	private static final String URL = "jdbc:mariadb://%s:%s/%s";
@@ -27,85 +25,65 @@ public class Database {
 			try (var stmt = connection.createStatement()){
 				stmt.setQueryTimeout(10);
 				stmt.executeUpdate("CREATE TABLE IF NOT EXISTS `files` (" +
-						"`uuid` VARCHAR(36) NOT NULL , " +
-						"`parent` VARCHAR(36) NOT NULL , " +
-						"`type` BOOL NOT NULL , " +
+						"`id` VARCHAR(10) NOT NULL , " +
+						"`token` VARCHAR(20) NOT NULL , " +
 						"`name` LONGTEXT NOT NULL , " +
+						"`mime` TEXT NOT NULL , " +
 						"`data` JSON NOT NULL , " +
-						"PRIMARY KEY (`uuid`(36))," +
-						"UNIQUE(`uuid`));");
-			}
-			if (getFile("/") == null) {
-				try (var stmt = connection.prepareStatement("INSERT INTO `files` (`uuid`, `parent`, `type`, `name`, `data`) VALUES (?, ?, ?, ?, ?)")) {
-					stmt.setString(1, File.ROOT_UUID.toString());
-					stmt.setString(2, "");
-					stmt.setBoolean(3, false);
-					stmt.setString(4, "/");
-					stmt.setString(5, "{}");
-
-					stmt.executeUpdate();
-				}
+						"PRIMARY KEY (`id`(10))," +
+						"UNIQUE(`id`));");
 			}
 		}
 	}
 
 	@Nullable
-	public File getFile(@NotNull String name) {
-		if (name.isEmpty())
-			return null;
-		if (name.equals("/"))
-			return File.ROOT;
-
-		File file = null;
+	public DiscordFile getFile(@NotNull String id) {
 		try (var connection = dataSource.getConnection();
-			 var stmt = connection.prepareStatement("SELECT * FROM `files` WHERE `name` = ? LIMIT 1")) {
+			 var stmt = connection.prepareStatement("SELECT * FROM `files` WHERE `id` = ? LIMIT 1")) {
 			stmt.setQueryTimeout(10);
-			stmt.setString(1, name);
+			stmt.setString(1, id);
 
 			var set = stmt.executeQuery();
-			if (set.next()) {
-				file = new File(
-						set.getString("uuid"),
-						set.getString("parent"),
-						set.getBoolean("type"),
-						set.getString("name"),
-						set.getString("data"));
-			}
-		} catch (SQLException e) {
-			throw new RuntimeException(e);
-		}
-		return file;
-	}
+			if (!set.next())
+				return null;
 
-	@NotNull
-	public List<File> listFiles(@NotNull UUID parent) {
-		List<File> files = new ArrayList<>();
-		try (var connection = dataSource.getConnection();
-			 var stmt = connection.prepareStatement("SELECT * FROM `files` WHERE parent = ?")) {
-			stmt.setQueryTimeout(10);
-			stmt.setString(1, parent.toString());
-
-			var set = stmt.executeQuery();
-			while (set.next()) {
-				files.add(new File(
-					set.getString("uuid"),
-					set.getString("parent"),
-					set.getBoolean("type"),
+			return new DiscordFile(
+					set.getString("id"),
+					set.getString("token"),
 					set.getString("name"),
-					set.getString("data")));
-			}
+					set.getString("mime"),
+					set.getString("data"));
 		} catch (SQLException e) {
 			throw new RuntimeException(e);
 		}
-		return files;
 	}
 
-	public void putFile(@NotNull File file) {
+	public void deleteFile(@NotNull String id, @NotNull String token) throws SQLException {
 		try (var connection = dataSource.getConnection();
-			 var stmt = connection.prepareStatement("INSERT INTO `files` ")) {
+			 var stmt = connection.prepareStatement("DELETE FROM `files` WHERE `id` = ? AND `token` = ? LIMIT 1")) {
+			stmt.setQueryTimeout(10);
+			stmt.setString(1, id);
+			stmt.setString(2, token);
 
-		} catch (SQLException e) {
-			throw new RuntimeException(e);
+			stmt.executeUpdate();
+		}
+	}
+
+	public void saveFile(@NotNull DiscordFile file) throws SQLException {
+		var tmp = getFile(file.getId());
+		if (tmp != null && tmp.getToken().equals(file.getToken()))
+			deleteFile(file.getId(), file.getToken());
+
+		try (var connection = dataSource.getConnection();
+			 var stmt = connection.prepareStatement("INSERT INTO `files` (id, token, name, mime, data) VALUES (?,?,?,?,?)")) {
+			stmt.setQueryTimeout(10);
+			stmt.setString(1, file.getId());
+			stmt.setString(2, file.getToken());
+			stmt.setString(3, file.getName());
+			stmt.setString(4, file.getMime());
+			stmt.setString(5, Main.GSON.toJson(file.getParts()));
+
+			stmt.executeUpdate();
 		}
 	}
 }

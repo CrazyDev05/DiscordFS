@@ -1,0 +1,44 @@
+plugins {
+    id 'java'
+    id "io.freefair.lombok" version "8.4"
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+group = 'de.crazydev22'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // https://mvnrepository.com/artifact/com.google.code.gson/gson
+    implementation 'com.google.code.gson:gson:2.10.1'
+    // https://mvnrepository.com/artifact/org.mariadb.jdbc/mariadb-java-client
+    implementation 'org.mariadb.jdbc:mariadb-java-client:3.2.0'
+    // https://mvnrepository.com/artifact/org.jetbrains/annotations
+    compileOnly 'org.jetbrains:annotations:24.0.0'
+    // https://mvnrepository.com/artifact/org.eclipse.jetty/jetty-server
+    implementation 'org.eclipse.jetty:jetty-server:11.0.16'
+    // https://mvnrepository.com/artifact/org.eclipse.jetty/jetty-servlet
+    implementation 'org.eclipse.jetty:jetty-servlet:11.0.16'
+    // https://mvnrepository.com/artifact/ch.qos.logback/logback-classic
+    implementation 'ch.qos.logback:logback-classic:1.4.11'
+
+    // https://mvnrepository.com/artifact/club.minnced/discord-webhooks
+    implementation 'club.minnced:discord-webhooks:0.8.4'
+    // https://mvnrepository.com/artifact/org.apache.commons/commons-lang3
+    implementation 'org.apache.commons:commons-lang3:3.14.0'
+    // https://mvnrepository.com/artifact/org.jodd/jodd-util
+    implementation 'org.jodd:jodd-util:6.2.2'
+}
+
+shadowJar {
+    archiveClassifier = ''
+    manifest {
+        attributes 'Main-Class': 'de.crazydev22.discordfs.Main'
+    }
+}
+
+tasks.build.dependsOn(shadowJar)
+tasks.compileJava.dependsOn(delombok)

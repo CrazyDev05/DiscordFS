@@ -1,65 +1,67 @@
 package de.crazydev22.utils;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.SneakyThrows;
+
 import javax.crypto.Cipher;
+import javax.crypto.CipherInputStream;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
+import java.io.InputStream;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 
 public class CipherUtil {
 
-	public static Pair encrypt(byte[] clean, String key) {
+	public static Pair<byte[], byte[]> encrypt(byte[] clean, String key) {
+		byte[] iv = createIV();
+		return new Pair<>(iv, encrypt(clean, key, iv));
+	}
 
+	@SneakyThrows
+	public static byte[] encrypt(byte[] clean, String key, byte[] iv) {
+		return create(Cipher.ENCRYPT_MODE, key, iv).doFinal(clean);
+	}
+
+	@SneakyThrows
+	public static byte[] decrypt(byte[] encrypted, String key, byte[] iv) {
+		return create(Cipher.DECRYPT_MODE, key, iv).doFinal(encrypted);
+	}
+
+	public static Pair<byte[], CipherInputStream> decrypt(InputStream is, String key) {
+		byte[] iv = createIV();
+		return new Pair<>(iv, new CipherInputStream(is, create(Cipher.DECRYPT_MODE, key, iv)));
+	}
+
+	public static CipherInputStream decrypt(InputStream is, String key, byte[] iv) {
+		return new CipherInputStream(is, create(Cipher.DECRYPT_MODE, key, iv));
+	}
+
+	private static byte[] createIV() {
 		// Generating IV.
 		int ivSize = 16;
 		byte[] iv = new byte[ivSize];
 		SecureRandom random = new SecureRandom();
 		random.nextBytes(iv);
 
-		return new Pair(iv, encrypt(clean, iv, key));
+		return iv;
 	}
 
-	public static byte[] encrypt(byte[] clean, byte[] iv, String key) {
-		try {
-			IvParameterSpec ivParameterSpec = new IvParameterSpec(iv);
+	@SneakyThrows
+	public static Cipher create(int mode, String key, byte[] iv) {
+		// Hash key.
+		byte[] keyBytes = new byte[16];
+		MessageDigest md = MessageDigest.getInstance("SHA-256");
+		md.update(key.getBytes());
+		System.arraycopy(md.digest(), 0, keyBytes, 0, keyBytes.length);
+		SecretKeySpec secretKeySpec = new SecretKeySpec(keyBytes, "AES");
 
-			// Hashing key.
-			MessageDigest digest = MessageDigest.getInstance("SHA-256");
-			digest.update(key.getBytes(StandardCharsets.UTF_8));
-			byte[] keyBytes = new byte[16];
-			System.arraycopy(digest.digest(), 0, keyBytes, 0, keyBytes.length);
-			SecretKeySpec secretKeySpec = new SecretKeySpec(keyBytes, "AES");
-
-			// Encrypt.
-			Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-			cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec, ivParameterSpec);
-
-			return cipher.doFinal(clean);
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
-	}
-
-	public static byte[] decrypt(byte[] encrypted, byte[] iv, String key) {
-		try {
-			int keySize = 16;
-			IvParameterSpec ivParameterSpec = new IvParameterSpec(iv);
-
-			// Hash key.
-			byte[] keyBytes = new byte[keySize];
-			MessageDigest md = MessageDigest.getInstance("SHA-256");
-			md.update(key.getBytes());
-			System.arraycopy(md.digest(), 0, keyBytes, 0, keyBytes.length);
-			SecretKeySpec secretKeySpec = new SecretKeySpec(keyBytes, "AES");
-
-			// Decrypt.
-			Cipher cipherDecrypt = Cipher.getInstance("AES/CBC/PKCS5Padding");
-			cipherDecrypt.init(Cipher.DECRYPT_MODE, secretKeySpec, ivParameterSpec);
-			return cipherDecrypt.doFinal(encrypted);
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
+		// init Cipher
+		Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+		cipher.init(mode, secretKeySpec, new IvParameterSpec(iv));
+		return cipher;
 	}
 
 	public static String toString(byte[] bytes) {
@@ -81,6 +83,4 @@ public class CipherUtil {
 
 		return bytes;
 	}
-
-	public record Pair(byte[] iv, byte[] encrypted){}
 }
