@@ -1,4 +1,3 @@
-import de.crazydev22.utils.CipherUtil;
 import lombok.SneakyThrows;
 
 import java.io.*;
@@ -13,10 +12,31 @@ import java.util.concurrent.atomic.AtomicLong;
 public class Test {
 
 	public static void main(String[] args) throws Throwable {
-		System.out.println("\n" + HttpClient.newHttpClient().send(HttpRequest.newBuilder()
-						.uri(URI.create("http://localhost:8080/Dr%20Stone%20(AMV)%20GLITTER%20&%20GOLD_v720P.mp4"))
-						.PUT(HttpRequest.BodyPublishers.ofFile(new File("Dr Stone (AMV) GLITTER & GOLD_v720P.mp4").toPath()))
-				.build(), HttpResponse.BodyHandlers.ofString()).body());
+		var resp = HttpClient.newHttpClient().send(HttpRequest.newBuilder()
+				.uri(URI.create("http://localhost:8080/upload/White%20Snake.mp4"))
+				.PUT(HttpRequest.BodyPublishers.ofInputStream(() -> getFile("White Snake.mp4")))
+				.build(), HttpResponse.BodyHandlers.ofString());
+		System.out.println("\n" + resp);
+		System.out.println(resp.body());
+	}
+
+	@SneakyThrows
+	private static InputStream getFile(String name) {
+		File file = new File(name);
+		long start = System.currentTimeMillis();
+		AtomicLong uses = new AtomicLong();
+		return new InputStream() {
+			private final FileInputStream input = new FileInputStream(file);
+			@Override
+			public int read() throws IOException {
+				int r = input.read();
+				if (r != -1) {
+					if (uses.incrementAndGet() % 5341 == 0)
+						printProgress(start, file.length(), uses.get());
+				}
+				return r;
+			}
+		};
 	}
 
 	@SneakyThrows

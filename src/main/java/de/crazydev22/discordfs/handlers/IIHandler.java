@@ -2,45 +2,92 @@ package de.crazydev22.discordfs.handlers;
 
 import club.minnced.discord.webhook.WebhookClient;
 import com.google.gson.JsonObject;
-import com.sun.net.httpserver.HttpExchange;
 import de.crazydev22.discordfs.Database;
 import de.crazydev22.discordfs.Main;
 import de.crazydev22.utils.IHandler;
 import de.crazydev22.utils.JsonConfiguration;
+import jakarta.servlet.WriteListener;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import org.slf4j.Logger;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class IIHandler extends IHandler {
+public abstract class IIHandler extends IHandler {
 	private final Database database = Main.getInstance().getDatabase();
 	private final WebhookClient client = Main.getInstance().getWebhook();
 	private final JsonConfiguration<JsonObject> config = Main.getInstance().getConfiguration();
 
-	public IIHandler(Logger logger) {
-		super(logger);
+	@Override
+	public void GET(@NotNull HttpServletRequest request, @NotNull HttpServletResponse response) throws Throwable {
+		super.GET(request, response);
 	}
 
-	protected void transferStream(InputStream in, OutputStream out, int buffer) throws IOException {
-		byte[] buf = new byte[buffer];
-		int length;
-		try (in; out) {
-			while ((length = in.read(buf)) != -1) {
-				out.write(buf, 0, length);
+	@Override
+	public void HEAD(@NotNull HttpServletRequest request, @NotNull HttpServletResponse response) throws Throwable {
+		super.HEAD(request, response);
+	}
+
+	@Override
+	public void POST(@NotNull HttpServletRequest request, @NotNull HttpServletResponse response) throws Throwable {
+		super.POST(request, response);
+	}
+
+	@Override
+	public void PUT(@NotNull HttpServletRequest request, @NotNull HttpServletResponse response) throws Throwable {
+		super.PUT(request, response);
+	}
+
+	@Override
+	public void DELETE(@NotNull HttpServletRequest request, @NotNull HttpServletResponse response) throws Throwable {
+		super.DELETE(request, response);
+	}
+
+	@Override
+	public void OPTIONS(@NotNull HttpServletRequest request, @NotNull HttpServletResponse response) throws Throwable {
+		super.OPTIONS(request, response);
+	}
+
+	@Override
+	public void TRACE(@NotNull HttpServletRequest request, @NotNull HttpServletResponse response) throws Throwable {
+		super.TRACE(request, response);
+	}
+
+	protected final void transferStreamAsync(@NotNull HttpServletRequest request, @NotNull HttpServletResponse response,
+											 @NotNull InputStream in, int status, int buffer) throws IOException {
+		var async = request.startAsync();
+		var out = response.getOutputStream();
+		out.setWriteListener(new WriteListener() {
+			private final byte[] buf = new byte[buffer];
+
+			@Override
+			public void onWritePossible() throws IOException {
+				while (out.isReady()) {
+					int length = in.read(buf);
+					if (length == -1) {
+						response.setStatus(status);
+						async.complete();
+						return;
+					}
+					out.write(buf, 0, length);
+				}
 			}
-		}
+
+			@Override
+			public void onError(Throwable t) {
+				getServletContext().log("Async Error", t);
+				async.complete();
+			}
+		});
 	}
 
-	protected void sendText(HttpExchange exchange, int code, String msg) throws IOException {
-		exchange.sendResponseHeaders(code, msg.getBytes().length);
-		try (var out = exchange.getResponseBody()) {
-			out.write(msg.getBytes());
-		}
-		exchange.close();
+	protected final void sendText(@NotNull HttpServletResponse response, int code, @NotNull String msg) throws IOException {
+		response.setStatus(code);
+		response.getWriter().println(msg);
 	}
 }

@@ -1,8 +1,6 @@
 package de.crazydev22.utils;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import de.crazydev22.utils.container.Pair;
 import lombok.SneakyThrows;
 
 import javax.crypto.Cipher;
@@ -47,6 +45,15 @@ public class CipherUtil {
 		random.nextBytes(iv);
 
 		return iv;
+	}
+
+	@SneakyThrows
+	public static byte[] createHash(String key, int length) {
+		byte[] keyBytes = new byte[length];
+		MessageDigest md = MessageDigest.getInstance("SHA-256");
+		md.update(key.getBytes());
+		System.arraycopy(md.digest(), 0, keyBytes, 0, keyBytes.length);
+		return keyBytes;
 	}
 
 	@SneakyThrows

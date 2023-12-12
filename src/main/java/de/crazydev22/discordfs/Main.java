@@ -5,23 +5,23 @@ import club.minnced.discord.webhook.WebhookClientBuilder;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
-import com.sun.net.httpserver.HttpServer;
-import de.crazydev22.discordfs.handlers.DownloadHandler;
+import de.crazydev22.discordfs.handlers.FileHandler;
 import de.crazydev22.discordfs.handlers.IndexHandler;
-import de.crazydev22.discordfs.handlers.UploadHandler;
+import de.crazydev22.discordfs.handlers.RoutingHandler;
 import de.crazydev22.utils.JsonConfiguration;
-import de.crazydev22.utils.JsonUtil;
 import lombok.Data;
 import lombok.Getter;
+import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.servlet.ServletHandler;
+import org.eclipse.jetty.servlet.ServletHolder;
+import org.eclipse.jetty.util.thread.QueuedThreadPool;
+import org.eclipse.jetty.util.thread.ThreadPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.InetSocketAddress;
 import java.util.Map;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 
 @Data
 public class Main {
@@ -40,17 +40,22 @@ public class Main {
 			"mariadb.password", "password",
 			"cipher", "",
 			"webhook", "https://discord.com/api/webhooks/<>/<>",
-			"threads", 10
+			"minThreads", 1,
+			"maxThreads", Runtime.getRuntime().availableProcessors(),
+			"idleTimeout", 120
 	)).getContent());
-	private final Executor executor;
+	private final ThreadPool threadPool;
 	private final WebhookClient webhook;
 	private final Database database;
-	private final HttpServer server;
+	private final Server server;
 
 	public Main() throws Exception {
 		instance = this;
 
-		executor = Executors.newFixedThreadPool(configuration.getInt("threads").orElseThrow());
+		threadPool = new QueuedThreadPool(
+				configuration.getInt("maxThreads").orElse(Runtime.getRuntime().availableProcessors()),
+				configuration.getInt("minThreads").orElse(1),
+				configuration.getInt("idleTimeout").orElse(120));
 		database = new Database(
 				configuration.getString("mariadb.host").orElseThrow(),
 				configuration.getInt("mariadb.port").orElseThrow(),
@@ -61,14 +66,21 @@ public class Main {
 		builder.setWait(true);
 		webhook = builder.build();
 
-		server = HttpServer.create(new InetSocketAddress(8080), 0);
-		server.createContext("/download", new DownloadHandler());
-		server.createContext("/upload", new UploadHandler());
-		server.createContext("/", new IndexHandler());
-		server.setExecutor(executor);
-		server.start();
+		server = new Server(threadPool);
+		var connector = new ServerConnector(server);
+		connector.setPort(8080);
+		server.setConnectors(new Connector[]{connector});
 
-		logger.info("Started!");
+		var servletHandler = new ServletHandler();
+		server.setHandler(servletHandler);
+		RoutingHandler handler = new RoutingHandler();
+		var routes = handler.getRoutes();
+		routes.add(0, "^/files/.*", new FileHandler());
+		routes.add(Integer.MAX_VALUE, ".*", new IndexHandler());
+
+		servletHandler.addServletWithMapping(new ServletHolder(handler), "/*");
+
+		server.start();
 	}
 
 	public static void main(String[] args) throws Exception {
