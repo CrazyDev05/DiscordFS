@@ -10,12 +10,13 @@ import de.crazydev22.discordfs.streams.IteratingInputSteam;
 import de.crazydev22.discordfs.streams.LimitingInputStream;
 import de.crazydev22.utils.CipherUtil;
 import de.crazydev22.utils.JsonUtil;
-import jodd.net.MimeTypes;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.SneakyThrows;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.eclipse.jetty.http.MimeTypes;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.EOFException;
 import java.io.InputStream;
@@ -29,6 +30,7 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public final class DiscordFile {
 	private static final Type LIST_TYPE = TypeToken.getParameterized(ArrayList.class, Part.class).getType();
+	private static final String OCTET_STREAM = "application/octet-stream";
 
 	private final @NotNull String id;
 	private final @NotNull String token;
@@ -36,17 +38,19 @@ public final class DiscordFile {
 	private final @NotNull String mime;
 	private final @NotNull List<Part> parts;
 
-	private DiscordFile(@NotNull String id, @NotNull String name) {
-		this(id, RandomStringUtils.randomAlphanumeric(20), name, MimeTypes.getMimeType(name), new ArrayList<>());
+	private DiscordFile(@NotNull String id, @NotNull String name, @NotNull String mime) {
+		this(id, RandomStringUtils.randomAlphanumeric(20), name, mime, new ArrayList<>());
 	}
 
 	@NotNull
-	public static DiscordFile create(@NotNull String name) {
-		String id = RandomStringUtils.randomAlphanumeric(10);
-		Database database = Main.getInstance().getDatabase();
-		while (database.getFile(id) != null)
-			id = RandomStringUtils.randomAlphanumeric(10);
-		return new DiscordFile(id, name);
+	public static DiscordFile create(@NotNull String name, @Nullable String mime) {
+		return create(RandomStringUtils.randomAlphanumeric(10), name, mime);
+	}
+
+	@NotNull
+	public static DiscordFile create(@NotNull String id, @NotNull String name, @Nullable String mime) {
+		if (mime == null) mime = OCTET_STREAM;
+		return new DiscordFile(id, name, mime);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -59,6 +63,10 @@ public final class DiscordFile {
 		for (var part : parts)
 			size+= part.getSize();
 		return size;
+	}
+
+	public boolean matchesToken(@Nullable String token) {
+		return token != null && token.length() > 7 && getToken().equals(token.substring(7));
 	}
 
 	@SneakyThrows

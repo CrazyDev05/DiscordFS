@@ -25,23 +25,24 @@ public class Database {
 			try (var stmt = connection.createStatement()){
 				stmt.setQueryTimeout(10);
 				stmt.executeUpdate("CREATE TABLE IF NOT EXISTS `files` (" +
-						"`id` VARCHAR(10) NOT NULL , " +
-						"`token` VARCHAR(20) NOT NULL , " +
-						"`name` LONGTEXT NOT NULL , " +
-						"`mime` TEXT NOT NULL , " +
-						"`data` JSON NOT NULL , " +
-						"PRIMARY KEY (`id`(10))," +
-						"UNIQUE(`id`));");
+						"`id` VARCHAR(10) NOT NULL, " +
+						"`token` VARCHAR(20) NOT NULL, " +
+						"`name` LONGTEXT NOT NULL, " +
+						"`mime` TEXT NOT NULL, " +
+						"`data` JSON NOT NULL, " +
+						"INDEX (`id`), " +
+						"INDEX (`name`));");
 			}
 		}
 	}
 
 	@Nullable
-	public DiscordFile getFile(@NotNull String id) {
+	public DiscordFile getFile(@NotNull String id, @NotNull String name) {
 		try (var connection = dataSource.getConnection();
-			 var stmt = connection.prepareStatement("SELECT * FROM `files` WHERE `id` = ? LIMIT 1")) {
+			 var stmt = connection.prepareStatement("SELECT * FROM `files` WHERE `id` = ? AND `name` = ? LIMIT 1")) {
 			stmt.setQueryTimeout(10);
 			stmt.setString(1, id);
+			stmt.setString(2, name);
 
 			var set = stmt.executeQuery();
 			if (!set.next())
@@ -58,21 +59,22 @@ public class Database {
 		}
 	}
 
-	public void deleteFile(@NotNull String id, @NotNull String token) throws SQLException {
+	public void deleteFile(@NotNull String id, @NotNull String name, @NotNull String token) throws SQLException {
 		try (var connection = dataSource.getConnection();
-			 var stmt = connection.prepareStatement("DELETE FROM `files` WHERE `id` = ? AND `token` = ? LIMIT 1")) {
+			 var stmt = connection.prepareStatement("DELETE FROM `files` WHERE `id` = ? AND `name` = ? AND `token` = ? LIMIT 1")) {
 			stmt.setQueryTimeout(10);
 			stmt.setString(1, id);
-			stmt.setString(2, token);
+			stmt.setString(2, name);
+			stmt.setString(3, token);
 
 			stmt.executeUpdate();
 		}
 	}
 
 	public void saveFile(@NotNull DiscordFile file) throws SQLException {
-		var tmp = getFile(file.getId());
-		if (tmp != null && tmp.getToken().equals(file.getToken()))
-			deleteFile(file.getId(), file.getToken());
+		//var tmp = getFile(file.getId(), file.getName());
+		//if (tmp != null && tmp.getToken().equals(file.getToken()))
+		//	deleteFile(file.getId(), file.getToken());
 
 		try (var connection = dataSource.getConnection();
 			 var stmt = connection.prepareStatement("INSERT INTO `files` (id, token, name, mime, data) VALUES (?,?,?,?,?)")) {

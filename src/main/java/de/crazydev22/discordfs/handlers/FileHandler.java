@@ -1,14 +1,20 @@
 package de.crazydev22.discordfs.handlers;
 
 import club.minnced.discord.webhook.send.WebhookMessage;
+import com.google.gson.JsonObject;
 import de.crazydev22.discordfs.DiscordFile;
 import de.crazydev22.utils.CipherUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.json.JSONObject;
 
 import java.io.InputStream;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -22,14 +28,11 @@ public class FileHandler extends IIHandler {
 
 	@Override
 	public void GET(@NotNull HttpServletRequest request, @NotNull HttpServletResponse response) throws Throwable {
-		getLogger().info(request.toString());
-
-		DiscordFile file = getDatabase().getFile(request.getRequestURI().substring("/files/".length()));
+		DiscordFile file = getFile(request.getRequestURI());
 		if (file == null) {
 			sendText(response, 404, "File not found");
 			return;
 		}
-
 
 		if (file.getParts().isEmpty()) {
 			sendText(response, 503, "File empty");
@@ -37,7 +40,7 @@ public class FileHandler extends IIHandler {
 		}
 
 		var rangeHeader = request.getHeader("Range");
-		if (rangeHeader != null) {
+		if (rangeHeader != null && getConfig().getBoolean("rangeHeader").orElse(true)) {
 			var rangeValue = rangeHeader.trim().substring("bytes=".length());
 			long fileLength = file.getSize();
 			long start, end;
@@ -73,16 +76,47 @@ public class FileHandler extends IIHandler {
 	@Override
 	public void PUT(@NotNull HttpServletRequest request, @NotNull HttpServletResponse response) throws Throwable {
 		String name = request.getRequestURI().substring("/files/".length());
-		var file = uploadFile(name, request.getInputStream());
+		name = URLDecoder.decode(name, StandardCharsets.UTF_8);
+		while (name.contains("\\")) name = name.replace("\\", "/");
+		while (name.contains("//")) name = name.replace("//", "/");
+
+		var file = uploadFile(request.getHeader("file-id"), name, request.getInputStream());
 		getDatabase().saveFile(file);
 		response.setHeader("Content-Type", "application/json; charset=utf-8");
-		sendText(response, 200, "{\"token\": \"" + file.getToken() + "\", \"id\":\"" + file.getId() + "\"}");
+		JSONObject object = new JSONObject();
+		object.put("token", file.getToken());
+		object.put("id", file.getId());
+		object.put("url", "/files/" + file.getId() + "/" + URLEncoder.encode(file.getName(), StandardCharsets.UTF_8));
+		sendText(response, 200, object.toString());
+	}
+
+	@Override
+	public void DELETE(@NotNull HttpServletRequest request, @NotNull HttpServletResponse response) throws Throwable {
+		DiscordFile file = getFile(request.getRequestURI());
+		if (file == null || !file.matchesToken(request.getHeader("Authorization"))) {
+			sendText(response, 404, "File not found");
+			return;
+		}
+
+		for (var part : file.getParts())
+			getClient().delete(part.messageID());
+
+		getDatabase().deleteFile(file.getId(), file.getName(), file.getToken());
+	}
+
+	private DiscordFile getFile(String uri) {
+		String[] parts = uri.substring("/files/".length()).split("/", 2);
+		for (int i = 0; i < parts.length; i++)
+			parts[i] = URLDecoder.decode(parts[i], StandardCharsets.UTF_8);
+		return getDatabase().getFile(parts[0], parts[1]);
 	}
 
 	@SneakyThrows
-	private DiscordFile uploadFile(String name, InputStream inputStream) {
+	private DiscordFile uploadFile(@Nullable String id, @NotNull String name, @NotNull InputStream inputStream) {
 		var done = false;
-		var file = DiscordFile.create(name);
+		var file = id != null ?
+				DiscordFile.create(id, name, getServletContext().getMimeType(name)) :
+				DiscordFile.create(name, getServletContext().getMimeType(name));
 
 		try (var stream = inputStream) {
 			while (!done) {

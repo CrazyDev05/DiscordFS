@@ -1,9 +1,14 @@
 <!DOCTYPE html>
-<html>
+<html lang="de">
+	<head>
+		<script src="/player.js" type="text/javascript"></script>
+		<title>Video</title>
+	</head>
 	<body>
-		<video width="320" height="240" controls>
-			<source src="http://localhost:8080/download/GMYxsLZPHR" type="video/mp4">
-Your browser does not support the video tag.
-		</video>
+		<div id="player-1"></div>
+
+		<script>
+			new Playerjs({id:"player-1", file:"/files/hqnY2KnJ00/Dr.+Stone%2FS01%2FE01%2Findex.m3u8"});
+		</script>
 	</body>
 </html>

@@ -29,8 +29,6 @@ dependencies {
     implementation 'club.minnced:discord-webhooks:0.8.4'
     // https://mvnrepository.com/artifact/org.apache.commons/commons-lang3
     implementation 'org.apache.commons:commons-lang3:3.14.0'
-    // https://mvnrepository.com/artifact/org.jodd/jodd-util
-    implementation 'org.jodd:jodd-util:6.2.2'
 }
 
 shadowJar {

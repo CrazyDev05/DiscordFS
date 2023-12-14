@@ -21,6 +21,7 @@ import org.eclipse.jetty.util.thread.ThreadPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.Map;
 
 @Data
@@ -32,7 +33,7 @@ public class Main {
 
 	private static @Getter Main instance;
 
-	private final JsonConfiguration<JsonObject> configuration = new JsonConfiguration<>("config.json", JsonConfiguration.fromMap(Map.of(
+	private final JsonConfiguration<JsonObject> configuration = new JsonConfiguration<>("config.json", JsonConfiguration.fromMap(
 			"mariadb.host", "localhost",
 			"mariadb.port", 3306,
 			"mariadb.database", "discordfs",
@@ -42,8 +43,9 @@ public class Main {
 			"webhook", "https://discord.com/api/webhooks/<>/<>",
 			"minThreads", 1,
 			"maxThreads", Runtime.getRuntime().availableProcessors(),
-			"idleTimeout", 120
-	)).getContent());
+			"idleTimeout", 120,
+			"rangeHeader", true
+	).getContent());
 	private final ThreadPool threadPool;
 	private final WebhookClient webhook;
 	private final Database database;

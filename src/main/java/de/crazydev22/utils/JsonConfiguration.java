@@ -48,6 +48,15 @@ public class JsonConfiguration<T extends JsonElement> {
 		return config;
 	}
 
+	@NotNull
+	public static JsonConfiguration<JsonObject> fromMap(Object... objects) {
+		if (objects.length % 2 != 0) throw new IllegalArgumentException();
+		JsonConfiguration<JsonObject> config = new JsonConfiguration<>(new JsonObject(), new JsonObject());
+		for (int i = 0; i < objects.length; i+=2)
+			config.set((String) objects[i], objects[i+1]);
+		return config;
+	}
+
 	public void setCreator(@NotNull Callable<JsonElement> creator) {
 		this.creator = creator;
 	}
