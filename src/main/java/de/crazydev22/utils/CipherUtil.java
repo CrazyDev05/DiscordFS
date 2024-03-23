@@ -44,6 +44,11 @@ public class CipherUtil {
 		return new Pair<>(iv, new CipherOutputStream(os, create(Cipher.ENCRYPT_MODE, key, iv)));
 	}
 
+	public static Pair<byte[], CipherInputStream> encrypt(InputStream in, byte[] key) {
+		byte[] iv = createIV();
+		return new Pair<>(iv, new CipherInputStream(in, create(Cipher.ENCRYPT_MODE, key, iv)));
+	}
+
 	private static byte[] createIV() {
 		// Generating IV.
 		int ivSize = 16;

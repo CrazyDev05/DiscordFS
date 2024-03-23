@@ -1,5 +1,6 @@
 package de.crazydev22.utils.upload;
 
+import de.crazydev22.discordfs.streams.CountingInputStream;
 import de.crazydev22.utils.CipherUtil;
 import lombok.Getter;
 import lombok.NonNull;
@@ -19,7 +20,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
-@RequiredArgsConstructor
 public class StreamBody extends RequestBody {
 	private static final byte[] CRLF = new byte[]{'\r', '\n'};
 	private static final byte[] DASHDASH = new byte[]{'-', '-'};
@@ -28,7 +28,7 @@ public class StreamBody extends RequestBody {
 	private final List<byte[]> ivs = new ArrayList<>();
 	@Getter
 	private final List<Integer> sizes = new ArrayList<>();
-	private final @NonNull InputStream source;
+	private final CountingInputStream source;
 	private final @NonNull String boundary;
 	private final byte[] key;
 	private final long splitSize;
@@ -37,7 +37,11 @@ public class StreamBody extends RequestBody {
 	private boolean done;
 
 	public StreamBody(@NonNull InputStream source, @NonNull String boundary, @Nullable String key, long splitSize, int maxCount) {
-		this(source, URLEncoder.encode(boundary, StandardCharsets.UTF_8), key != null ? CipherUtil.createHash(key, 16) : null, splitSize, maxCount);
+		this.source = new CountingInputStream(source);
+		this.boundary = URLEncoder.encode(boundary, StandardCharsets.UTF_8);
+		this.key = key != null ? CipherUtil.createHash(key, 16) : null;
+		this.splitSize = splitSize;
+		this.maxCount = maxCount;
 	}
 
 	@Nullable
@@ -50,37 +54,38 @@ public class StreamBody extends RequestBody {
 	public void writeTo(@NotNull BufferedSink sink) throws IOException {
 		int count = 0;
 		done = false;
-		byte[] buf = new byte[8096];
 		while (!done && count < maxCount) {
 			sink.write(DASHDASH).writeUtf8(boundary).write(CRLF);
 			sink.writeUtf8("Content-Disposition: form-data; name=\"file"+count+"\"; filename=\"part-"+(count++)+".bin\"").write(CRLF);
 			sink.write(CRLF);
-			done = writeBytes(sink, buf);
+			done = writeBytes(sink);
 			sink.write(CRLF);
 		}
 		sink.write(DASHDASH).writeUtf8(boundary).write(DASHDASH).write(CRLF);
 	}
 
-	private boolean writeBytes(@NotNull BufferedSink sink, byte[] buf) throws IOException {
-		int bytes = 0;
-		var out = getOutputStream(sink);
+	private boolean writeBytes(@NotNull BufferedSink sink) throws IOException {
 		try {
-			while (bytes + buf.length <= splitSize) {
-				int length = source.read(buf);
+			source.setCounter(0);
+			byte[] buf = new byte[4096];
+			var in = getInputStream();
+			while (source.getCounter() + buf.length <= splitSize) {
+				int length = in.read(buf);
 				if (length == -1) return true;
-				out.write(buf, 0, length);
-				bytes += length;
+				sink.write(buf, 0, length);
 			}
 			return false;
+		} catch (Throwable e) {
+			e.printStackTrace();
+			return true;
 		} finally {
-			sizes.add(bytes);
+			sizes.add((int) source.getCounter());
 		}
 	}
 
-	private OutputStream getOutputStream(BufferedSink sink) {
-		OutputStream out = sink.outputStream();
-		if (key == null) return out;
-		var pair = CipherUtil.encrypt(sink.outputStream(), key);
+	private InputStream getInputStream() {
+		if (key == null) return source;
+		var pair = CipherUtil.encrypt(source, key);
 		ivs.add(pair.getA());
 		return pair.getB();
 	}
