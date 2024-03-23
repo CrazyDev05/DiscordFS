@@ -5,9 +5,11 @@ import lombok.SneakyThrows;
 
 import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
+import javax.crypto.CipherOutputStream;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 
@@ -33,8 +35,13 @@ public class CipherUtil {
 		return new Pair<>(iv, new CipherInputStream(is, create(Cipher.DECRYPT_MODE, key, iv)));
 	}
 
-	public static CipherInputStream decrypt(InputStream is, String key, byte[] iv) {
+	public static CipherInputStream decrypt(InputStream is, byte[] key, byte[] iv) {
 		return new CipherInputStream(is, create(Cipher.DECRYPT_MODE, key, iv));
+	}
+
+	public static Pair<byte[], CipherOutputStream> encrypt(OutputStream os, byte[] key) {
+		byte[] iv = createIV();
+		return new Pair<>(iv, new CipherOutputStream(os, create(Cipher.ENCRYPT_MODE, key, iv)));
 	}
 
 	private static byte[] createIV() {
@@ -58,14 +65,17 @@ public class CipherUtil {
 
 	@SneakyThrows
 	public static Cipher create(int mode, String key, byte[] iv) {
-		// Hash key.
-		byte[] keyBytes = new byte[16];
-		MessageDigest md = MessageDigest.getInstance("SHA-256");
-		md.update(key.getBytes());
-		System.arraycopy(md.digest(), 0, keyBytes, 0, keyBytes.length);
-		SecretKeySpec secretKeySpec = new SecretKeySpec(keyBytes, "AES");
+		SecretKeySpec secretKeySpec = new SecretKeySpec(createHash(key, 16), "AES");
 
 		// init Cipher
+		Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+		cipher.init(mode, secretKeySpec, new IvParameterSpec(iv));
+		return cipher;
+	}
+
+	@SneakyThrows
+	public static Cipher create(int mode, byte[] key, byte[] iv) {
+		SecretKeySpec secretKeySpec = new SecretKeySpec(key, "AES");
 		Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 		cipher.init(mode, secretKeySpec, new IvParameterSpec(iv));
 		return cipher;

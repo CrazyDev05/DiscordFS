@@ -6,25 +6,21 @@ import club.minnced.discord.webhook.receive.ReadonlyMessage;
 import com.google.gson.*;
 import com.google.gson.reflect.TypeToken;
 import de.crazydev22.discordfs.streams.DiscordFileInputStream;
-import de.crazydev22.discordfs.streams.IteratingInputSteam;
 import de.crazydev22.discordfs.streams.LimitingInputStream;
-import de.crazydev22.utils.CipherUtil;
-import de.crazydev22.utils.JsonUtil;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.SneakyThrows;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.eclipse.jetty.http.MimeTypes;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.EOFException;
 import java.io.InputStream;
 import java.lang.reflect.Type;
-import java.net.URL;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 
 @Data
 @AllArgsConstructor

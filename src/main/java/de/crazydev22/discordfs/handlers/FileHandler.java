@@ -1,9 +1,10 @@
 package de.crazydev22.discordfs.handlers;
 
 import club.minnced.discord.webhook.send.WebhookMessage;
-import com.google.gson.JsonObject;
+
 import de.crazydev22.discordfs.DiscordFile;
 import de.crazydev22.utils.CipherUtil;
+import de.crazydev22.utils.upload.StreamBody;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
@@ -12,13 +13,11 @@ import org.jetbrains.annotations.Nullable;
 import org.json.JSONObject;
 
 import java.io.InputStream;
+import java.net.URLConnection;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 
 public class FileHandler extends IIHandler {
 	private final String key = getConfig().getString("cipher").orElseThrow();
@@ -115,28 +114,15 @@ public class FileHandler extends IIHandler {
 	private DiscordFile uploadFile(@Nullable String id, @NotNull String name, @NotNull InputStream inputStream) {
 		var done = false;
 		var file = id != null ?
-				DiscordFile.create(id, name, getServletContext().getMimeType(name)) :
-				DiscordFile.create(name, getServletContext().getMimeType(name));
+				DiscordFile.create(id, name, URLConnection.guessContentTypeFromName(name)) :
+				DiscordFile.create(name, URLConnection.guessContentTypeFromName(name));
 
 		try (var stream = inputStream) {
+			var key = CipherUtil.createHash(this.key, 16);
 			while (!done) {
-				Map<String, byte[]> cache = new TreeMap<>(String::compareTo);
-				List<Integer> sizes = new ArrayList<>(attachmetsPerFile);
-				List<byte[]> ivs = new ArrayList<>(attachmetsPerFile);
-
-				for (int i = 0; i < attachmetsPerFile; i++) {
-					var bytes = stream.readNBytes(maxFileSize);
-					var pair = CipherUtil.encrypt(bytes, key);
-					cache.put("part-"+i+".bin", pair.getB());
-					ivs.add(pair.getA());
-					sizes.add(bytes.length);
-					if (bytes.length != maxFileSize) {
-						done = true;
-						break;
-					}
-				}
-
-				file.getParts().add(new DiscordFile.Part(getClient().send(WebhookMessage.files(cache)).get().getId(), ivs, sizes));
+				var body = new StreamBody(stream, UUID.randomUUID().toString(), key, maxFileSize, attachmetsPerFile);
+				file.getParts().add(new DiscordFile.Part(getClient().send(body).get().getId(), body.getIvs(), body.getSizes()));
+				done = body.isDone();
 			}
 		}
 		return file;

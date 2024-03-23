@@ -39,4 +39,3 @@ shadowJar {
 }
 
 tasks.build.dependsOn(shadowJar)
-tasks.compileJava.dependsOn(delombok)

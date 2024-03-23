@@ -20,14 +20,14 @@ public class DiscordAttachmentInputStream extends InputStream {
 	private final IteratingInputSteam inputSteam = new IteratingInputSteam(this::hasNext, this::next);
 	private final DiscordFile.Part part;
 	private final List<String> urls;
-	private final String key;
+	private final byte[] key;
 	private int nextURL = 0;
 
 	@SneakyThrows
 	public DiscordAttachmentInputStream(DiscordFile.Part part, WebhookClient client, String key) {
 		this.part = part;
 		this.urls = part.loadAttachments(client).get();
-		this.key = key;
+		this.key = CipherUtil.createHash(key, 16);
 	}
 
 	@Override

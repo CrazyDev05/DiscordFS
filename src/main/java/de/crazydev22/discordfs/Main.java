@@ -8,7 +8,9 @@ import com.google.gson.JsonObject;
 import de.crazydev22.discordfs.handlers.FileHandler;
 import de.crazydev22.discordfs.handlers.IndexHandler;
 import de.crazydev22.discordfs.handlers.RoutingHandler;
+import de.crazydev22.utils.CipherUtil;
 import de.crazydev22.utils.JsonConfiguration;
+import de.crazydev22.utils.upload.Webhook;
 import lombok.Data;
 import lombok.Getter;
 import org.eclipse.jetty.server.Connector;
@@ -20,9 +22,6 @@ import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.eclipse.jetty.util.thread.ThreadPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.List;
-import java.util.Map;
 
 @Data
 public class Main {
@@ -47,9 +46,10 @@ public class Main {
 			"rangeHeader", true
 	).getContent());
 	private final ThreadPool threadPool;
-	private final WebhookClient webhook;
+	private final Webhook webhook;
 	private final Database database;
 	private final Server server;
+	private final byte[] cipher;
 
 	public Main() throws Exception {
 		instance = this;
@@ -64,9 +64,11 @@ public class Main {
 				configuration.getString("mariadb.database").orElseThrow(),
 				configuration.getString("mariadb.user").orElseThrow(),
 				configuration.getString("mariadb.password").orElseThrow());
-		WebhookClientBuilder builder = new WebhookClientBuilder(configuration.getString("webhook").orElseThrow());
+		cipher = configuration.getString("cipher").map(key -> CipherUtil.createHash(key, 16)).orElseThrow();
+
+		var builder = new Webhook.Builder(configuration.getString("webhook").orElseThrow());
 		builder.setWait(true);
-		webhook = builder.build();
+		webhook = builder.buildWebhook();
 
 		server = new Server(threadPool);
 		var connector = new ServerConnector(server);

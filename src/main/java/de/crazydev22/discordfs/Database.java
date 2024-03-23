@@ -27,11 +27,10 @@ public class Database {
 				stmt.executeUpdate("CREATE TABLE IF NOT EXISTS `files` (" +
 						"`id` VARCHAR(10) NOT NULL, " +
 						"`token` VARCHAR(20) NOT NULL, " +
-						"`name` LONGTEXT NOT NULL, " +
+						"`name` VARCHAR(64) NOT NULL, " +
 						"`mime` TEXT NOT NULL, " +
 						"`data` JSON NOT NULL, " +
-						"INDEX (`id`), " +
-						"INDEX (`name`));");
+						"PRIMARY KEY (`id`, `name`));");
 			}
 		}
 	}
@@ -39,7 +38,7 @@ public class Database {
 	@Nullable
 	public DiscordFile getFile(@NotNull String id, @NotNull String name) {
 		try (var connection = dataSource.getConnection();
-			 var stmt = connection.prepareStatement("SELECT * FROM `files` WHERE `id` = ? AND `name` = ? LIMIT 1")) {
+			 var stmt = connection.prepareStatement("SELECT * FROM files WHERE `id` = ? AND `name` = ? LIMIT 1")) {
 			stmt.setQueryTimeout(10);
 			stmt.setString(1, id);
 			stmt.setString(2, name);
@@ -61,7 +60,7 @@ public class Database {
 
 	public void deleteFile(@NotNull String id, @NotNull String name, @NotNull String token) throws SQLException {
 		try (var connection = dataSource.getConnection();
-			 var stmt = connection.prepareStatement("DELETE FROM `files` WHERE `id` = ? AND `name` = ? AND `token` = ? LIMIT 1")) {
+			 var stmt = connection.prepareStatement("DELETE FROM files WHERE `id` = ? AND `name` = ? AND `token` = ? LIMIT 1")) {
 			stmt.setQueryTimeout(10);
 			stmt.setString(1, id);
 			stmt.setString(2, name);
@@ -72,12 +71,20 @@ public class Database {
 	}
 
 	public void saveFile(@NotNull DiscordFile file) throws SQLException {
-		//var tmp = getFile(file.getId(), file.getName());
-		//if (tmp != null && tmp.getToken().equals(file.getToken()))
-		//	deleteFile(file.getId(), file.getToken());
+		var tmp = getFile(file.getId(), file.getName());
+		if (tmp != null) {
+			if (tmp.getToken().equals(file.getToken())) {
+				var client = Main.getInstance().getWebhook();
+				for (var part : tmp.getParts())
+					client.delete(part.messageID());
+				deleteFile(file.getId(), file.getName(), file.getToken());
+			} else {
+				return;
+			}
+		}
 
 		try (var connection = dataSource.getConnection();
-			 var stmt = connection.prepareStatement("INSERT INTO `files` (id, token, name, mime, data) VALUES (?,?,?,?,?)")) {
+			 var stmt = connection.prepareStatement("INSERT INTO files (id, token, name, mime, data) VALUES (?,?,?,?,?)")) {
 			stmt.setQueryTimeout(10);
 			stmt.setString(1, file.getId());
 			stmt.setString(2, file.getToken());
