@@ -22,8 +22,8 @@ import java.util.*;
 public class FileHandler extends IIHandler {
 	private final String key = getConfig().getString("cipher").orElseThrow();
 
-	private static int maxFileSize = 1024*1024*5; //10MiB needs to be devidable by 512
-	private static int attachmetsPerFile = 4;
+	private int maxFileSize = getConfig().getInt("discord.maxFileSize").orElse(1024*1024*5); //10MiB needs to be devidable by 512
+	private int attachmetsPerFile = getConfig().getInt("discord.attachmentsPerFile").orElse(10);
 
 	@Override
 	public void GET(@NotNull HttpServletRequest request, @NotNull HttpServletResponse response) throws Throwable {

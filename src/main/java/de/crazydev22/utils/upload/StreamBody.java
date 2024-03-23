@@ -67,7 +67,7 @@ public class StreamBody extends RequestBody {
 	private boolean writeBytes(@NotNull BufferedSink sink) throws IOException {
 		try {
 			source.setCounter(0);
-			byte[] buf = new byte[4096];
+			byte[] buf = new byte[8192];
 			var in = getInputStream();
 			while (source.getCounter() + buf.length <= splitSize) {
 				int length = in.read(buf);
