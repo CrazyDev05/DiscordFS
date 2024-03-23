@@ -36,10 +36,10 @@ public class StreamBody extends RequestBody {
 	@Getter
 	private boolean done;
 
-	public StreamBody(@NonNull InputStream source, @NonNull String boundary, @Nullable String key, long splitSize, int maxCount) {
+	public StreamBody(@NonNull InputStream source, @NonNull String boundary, byte[] key, long splitSize, int maxCount) {
 		this.source = new CountingInputStream(source);
 		this.boundary = URLEncoder.encode(boundary, StandardCharsets.UTF_8);
-		this.key = key != null ? CipherUtil.createHash(key, 16) : null;
+		this.key = key;
 		this.splitSize = splitSize;
 		this.maxCount = maxCount;
 	}
