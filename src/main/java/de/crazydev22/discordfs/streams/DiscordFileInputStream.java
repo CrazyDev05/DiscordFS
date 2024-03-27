@@ -14,7 +14,7 @@ public class DiscordFileInputStream extends InputStream {
 	private final IteratingInputSteam inputSteam = new IteratingInputSteam(this::hasNext, this::next);
 	private final DiscordFile file;
 	private final WebhookClient client;
-	private final String key;
+	private final byte[] key;
 	private int nextPart = 0;
 	private int nextURL = -1;
 

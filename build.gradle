@@ -19,9 +19,9 @@ dependencies {
     // https://mvnrepository.com/artifact/org.jetbrains/annotations
     compileOnly 'org.jetbrains:annotations:24.0.0'
     // https://mvnrepository.com/artifact/org.eclipse.jetty/jetty-server
-    implementation 'org.eclipse.jetty:jetty-server:11.0.16'
+    implementation 'org.eclipse.jetty:jetty-server:11.0.20'
     // https://mvnrepository.com/artifact/org.eclipse.jetty/jetty-servlet
-    implementation 'org.eclipse.jetty:jetty-servlet:11.0.16'
+    implementation 'org.eclipse.jetty:jetty-servlet:11.0.20'
     // https://mvnrepository.com/artifact/ch.qos.logback/logback-classic
     implementation 'ch.qos.logback:logback-classic:1.4.11'
 

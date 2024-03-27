@@ -24,10 +24,10 @@ public class DiscordAttachmentInputStream extends InputStream {
 	private int nextURL = 0;
 
 	@SneakyThrows
-	public DiscordAttachmentInputStream(DiscordFile.Part part, WebhookClient client, String key) {
+	public DiscordAttachmentInputStream(DiscordFile.Part part, WebhookClient client, byte[] key) {
 		this.part = part;
 		this.urls = part.loadAttachments(client).get();
-		this.key = CipherUtil.createHash(key, 16);
+		this.key = key;
 	}
 
 	@Override

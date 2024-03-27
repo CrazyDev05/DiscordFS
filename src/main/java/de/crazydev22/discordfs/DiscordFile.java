@@ -7,6 +7,7 @@ import com.google.gson.*;
 import com.google.gson.reflect.TypeToken;
 import de.crazydev22.discordfs.streams.DiscordFileInputStream;
 import de.crazydev22.discordfs.streams.LimitingInputStream;
+import de.crazydev22.utils.CipherUtil;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.SneakyThrows;
@@ -99,7 +100,7 @@ public final class DiscordFile {
 	}
 
 	public DiscordFileInputStream read(WebhookClient client, String key) {
-		return new DiscordFileInputStream(this, client, key);
+		return new DiscordFileInputStream(this, client, CipherUtil.createHash(key, 16));
 	}
 
 	public record Part(long messageID, List<byte[]> ivs, List<Integer> partSizes) implements Cloneable {

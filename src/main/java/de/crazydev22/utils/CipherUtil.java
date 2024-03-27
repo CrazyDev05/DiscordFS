@@ -15,13 +15,13 @@ import java.security.SecureRandom;
 
 public class CipherUtil {
 
-	public static Pair<byte[], byte[]> encrypt(byte[] clean, String key) {
+	public static Pair<byte[], byte[]> encrypt(byte[] clean, byte[] key) {
 		byte[] iv = createIV();
 		return new Pair<>(iv, encrypt(clean, key, iv));
 	}
 
 	@SneakyThrows
-	public static byte[] encrypt(byte[] clean, String key, byte[] iv) {
+	public static byte[] encrypt(byte[] clean, byte [] key, byte[] iv) {
 		return create(Cipher.ENCRYPT_MODE, key, iv).doFinal(clean);
 	}
 

@@ -10,7 +10,6 @@ import de.crazydev22.discordfs.handlers.IndexHandler;
 import de.crazydev22.discordfs.handlers.RoutingHandler;
 import de.crazydev22.utils.CipherUtil;
 import de.crazydev22.utils.JsonConfiguration;
-import de.crazydev22.utils.upload.Webhook;
 import lombok.Data;
 import lombok.Getter;
 import org.eclipse.jetty.server.Connector;
@@ -46,7 +45,7 @@ public class Main {
 			"rangeHeader", true
 	).getContent());
 	private final ThreadPool threadPool;
-	private final Webhook webhook;
+	private final WebhookClient webhook;
 	private final Database database;
 	private final Server server;
 	private final byte[] cipher;
@@ -66,9 +65,9 @@ public class Main {
 				configuration.getString("mariadb.password").orElseThrow());
 		cipher = configuration.getString("cipher").map(key -> CipherUtil.createHash(key, 16)).orElseThrow();
 
-		var builder = new Webhook.Builder(configuration.getString("webhook").orElseThrow());
+		var builder = new WebhookClientBuilder(configuration.getString("webhook").orElseThrow());
 		builder.setWait(true);
-		webhook = builder.buildWebhook();
+		webhook = builder.build();
 
 		server = new Server(threadPool);
 		var connector = new ServerConnector(server);

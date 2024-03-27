@@ -1,8 +1,10 @@
 package de.crazydev22.discordfs.handlers;
 
-import club.minnced.discord.webhook.send.WebhookMessage;
-
+import club.minnced.discord.webhook.IOUtil;
+import club.minnced.discord.webhook.receive.EntityFactory;
+import club.minnced.discord.webhook.receive.ReadonlyMessage;
 import de.crazydev22.discordfs.DiscordFile;
+import de.crazydev22.discordfs.streams.PeekableInputStream;
 import de.crazydev22.utils.CipherUtil;
 import de.crazydev22.utils.upload.StreamBody;
 import jakarta.servlet.http.HttpServletRequest;
@@ -12,18 +14,21 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.json.JSONObject;
 
+import java.io.DataOutputStream;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.net.URLConnection;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.UUID;
 
 public class FileHandler extends IIHandler {
 	private final String key = getConfig().getString("cipher").orElseThrow();
 
-	private int maxFileSize = getConfig().getInt("discord.maxFileSize").orElse(1024*1024*5); //10MiB needs to be devidable by 512
-	private int attachmetsPerFile = getConfig().getInt("discord.attachmentsPerFile").orElse(10);
+	private final int maxFileSize = getConfig().getInt("discord.maxFileSize").orElseThrow(); //10MiB needs to be devidable by 512
+	private final int attachmetsPerFile = getConfig().getInt("discord.attachmentsPerFile").orElseThrow();
 
 	@Override
 	public void GET(@NotNull HttpServletRequest request, @NotNull HttpServletResponse response) throws Throwable {
@@ -61,15 +66,16 @@ public class FileHandler extends IIHandler {
 				response.setHeader("Access-Control-Allow-Origin", "*");
 				response.setHeader("Content-Length", contentLength + "");
 				response.setHeader("Content-Type", file.getMime());
-				transferStreamAsync(request, response, file.read(getClient(), key, start, end), 206, 8192);
-				return;
+				transferStreamAsync(request, response, file.read(getClient(), key, start, end), HttpServletResponse.SC_PARTIAL_CONTENT, 8192);
+			} else {
+				response.setStatus(HttpServletResponse.SC_REQUESTED_RANGE_NOT_SATISFIABLE);
 			}
+		} else {
+			response.setHeader("Access-Control-Allow-Origin", "*");
+			response.setHeader("Content-Length", file.getSize() + "");
+			response.setHeader("Content-Type", file.getMime());
+			transferStreamAsync(request, response, file.read(getClient(), key), HttpServletResponse.SC_OK, 8192);
 		}
-
-		response.setHeader("Access-Control-Allow-Origin", "*");
-		response.setHeader("Content-Length", file.getSize() + "");
-		response.setHeader("Content-Type", file.getMime());
-		transferStreamAsync(request, response, file.read(getClient(), key), 200, 8192);
 	}
 
 	@Override
@@ -117,14 +123,29 @@ public class FileHandler extends IIHandler {
 				DiscordFile.create(id, name, URLConnection.guessContentTypeFromName(name)) :
 				DiscordFile.create(name, URLConnection.guessContentTypeFromName(name));
 
-		try (var stream = inputStream) {
+		try (var stream = new PeekableInputStream(inputStream)) {
 			var key = CipherUtil.createHash(this.key, 16);
 			while (!done) {
 				var body = new StreamBody(stream, UUID.randomUUID().toString(), key, maxFileSize, attachmetsPerFile);
-				file.getParts().add(new DiscordFile.Part(getClient().send(body).get().getId(), body.getIvs(), body.getSizes()));
+				file.getParts().add(new DiscordFile.Part(post(body).getId(), body.getIvs(), body.getSizes()));
 				done = body.isDone();
 			}
 		}
 		return file;
+	}
+
+	@SneakyThrows
+	private ReadonlyMessage post(StreamBody body) {
+		HttpURLConnection http = (HttpURLConnection) new URL(getConfig().getString("webhook").orElseThrow() + "?wait=true").openConnection();
+		http.setRequestMethod("POST");
+		http.setDoOutput(true);
+
+		http.setRequestProperty("Content-Type", body.contentType());
+		try (var dos = new DataOutputStream(http.getOutputStream())) {
+			body.writeTo(dos);
+			dos.flush();
+		}
+
+		return EntityFactory.makeMessage(IOUtil.toJSON(http.getInputStream()));
 	}
 }
