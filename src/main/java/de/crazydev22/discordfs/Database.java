@@ -29,10 +29,9 @@ public class Database {
 		return cache.get(new Pair<>(id, name));
 	}
 
-	public void deleteFile(@NotNull String id, @NotNull String name, @NotNull String token) throws IOException {
+	public void deleteFile(@NotNull String id, @NotNull String name) throws IOException {
 		DiscordFile discordFile = cache.get(new Pair<>(id, name));
 		if (discordFile == null) throw new FileNotFoundException("File not found");
-		if (discordFile.notMatchesToken(token)) throw new IllegalArgumentException("Invalid token");
 		File file = getFile0(id, name, true);
 		if (!file.delete()) throw new IOException("Could not delete file");
 

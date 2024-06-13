@@ -103,10 +103,7 @@ public class FileHandler extends IIHandler {
 			return;
 		}
 
-		for (var part : file.getParts())
-			getClient().delete(part.messageID());
-
-		getDatabase().deleteFile(file.getId(), file.getName(), file.getToken());
+		getDatabase().deleteFile(file.getId(), file.getName());
 	}
 
 	private DiscordFile getFile(String uri) {
