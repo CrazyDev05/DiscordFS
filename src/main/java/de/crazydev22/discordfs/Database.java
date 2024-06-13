@@ -33,7 +33,7 @@ public class Database {
 		DiscordFile discordFile = cache.get(new Pair<>(id, name));
 		if (discordFile == null) throw new FileNotFoundException("File not found");
 		if (discordFile.notMatchesToken(token)) throw new IllegalArgumentException("Invalid token");
-		File file = getFile0(id, name);
+		File file = getFile0(id, name, true);
 		if (!file.delete()) throw new IOException("Could not delete file");
 
 		cache.invalidate(new Pair<>(id, name));
@@ -44,7 +44,9 @@ public class Database {
 	}
 
 	public void saveFile(@NotNull DiscordFile file) throws IOException {
-		File file0 = getFile0(file.getId(), file.getName());
+		File file0 = getFile0(file.getId(), file.getName(), false);
+		if (!file0.getParentFile().exists() && !file0.getParentFile().mkdirs())
+			throw new IOException("Could not create directory");
 
 		try (DataOutputStream dos = new DataOutputStream(new FileOutputStream(file0))) {
 			dos.writeUTF(file.getToken());
@@ -62,17 +64,20 @@ public class Database {
 		}
     }
 
-	private File getFile0(String id, String name) {
+	private File getFile0(String id, String name, boolean exists) {
 		if (!id.matches("^[a-zA-Z0-9]*$")) throw new IllegalArgumentException("Id contains invalid characters");
 		String basePath = this.minPath + id + File.separator;
 		File file = new File(basePath + name);
 		if (!file.getAbsolutePath().startsWith(basePath)) throw new IllegalArgumentException("Invalid file path");
-		if (!file.exists() || !file.isFile()) throw new IllegalArgumentException("File not found");
+		if (exists) {
+			if (!file.exists() || !file.isFile()) throw new IllegalArgumentException("File not found");
+			return file;
+		} else if (file.exists()) throw new IllegalArgumentException("File already exists");
 		return file;
 	}
 
 	private DiscordFile load(Pair<String, String> pair) {
-		File file = getFile0(pair.getA(), pair.getB());
+		File file = getFile0(pair.getA(), pair.getB(), true);
 		try (DataInputStream din = new DataInputStream(new FileInputStream(file))) {
 			String token = din.readUTF();
 			String mime = din.readUTF();
