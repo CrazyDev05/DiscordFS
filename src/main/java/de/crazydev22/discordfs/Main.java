@@ -2,8 +2,6 @@ package de.crazydev22.discordfs;
 
 import club.minnced.discord.webhook.WebhookClient;
 import club.minnced.discord.webhook.WebhookClientBuilder;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import de.crazydev22.discordfs.handlers.FileHandler;
 import de.crazydev22.discordfs.handlers.IndexHandler;
@@ -22,27 +20,23 @@ import org.eclipse.jetty.util.thread.ThreadPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+
 @Data
 public class Main {
 	public static final Logger logger = LoggerFactory.getLogger("DiscordFS");
-	public static final Gson GSON = new GsonBuilder()
-			.registerTypeAdapter(DiscordFile.Part.class, new DiscordFile.Part.Adapter())
-			.create();
 
 	private static @Getter Main instance;
 
 	private final JsonConfiguration<JsonObject> configuration = new JsonConfiguration<>("config.json", JsonConfiguration.fromMap(
-			"mariadb.host", "localhost",
-			"mariadb.port", 3306,
-			"mariadb.database", "discordfs",
-			"mariadb.user", "discordfs",
-			"mariadb.password", "password",
+			"storage", "files",
 			"cipher", "",
 			"webhook", "https://discord.com/api/webhooks/<>/<>",
-			"minThreads", 1,
-			"maxThreads", Runtime.getRuntime().availableProcessors(),
-			"idleTimeout", 120,
-			"rangeHeader", true
+			"web.minThreads", 1,
+			"web.maxThreads", Runtime.getRuntime().availableProcessors(),
+			"web.idleTimeout", 120,
+			"web.rangeHeader", true,
+			"web.port", 8080
 	).getContent());
 	private final ThreadPool threadPool;
 	private final WebhookClient webhook;
@@ -54,15 +48,10 @@ public class Main {
 		instance = this;
 
 		threadPool = new QueuedThreadPool(
-				configuration.getInt("maxThreads").orElse(Runtime.getRuntime().availableProcessors()),
-				configuration.getInt("minThreads").orElse(1),
-				configuration.getInt("idleTimeout").orElse(120));
-		database = new Database(
-				configuration.getString("mariadb.host").orElseThrow(),
-				configuration.getInt("mariadb.port").orElseThrow(),
-				configuration.getString("mariadb.database").orElseThrow(),
-				configuration.getString("mariadb.user").orElseThrow(),
-				configuration.getString("mariadb.password").orElseThrow());
+				configuration.getInt("web.maxThreads").orElse(Runtime.getRuntime().availableProcessors()),
+				configuration.getInt("web.minThreads").orElse(1),
+				configuration.getInt("web.idleTimeout").orElse(120));
+		database = new Database(new File(configuration.getString("storage").orElse("files")));
 		cipher = configuration.getString("cipher").map(key -> CipherUtil.createHash(key, 16)).orElseThrow();
 
 		var builder = new WebhookClientBuilder(configuration.getString("webhook").orElseThrow());
@@ -71,7 +60,7 @@ public class Main {
 
 		server = new Server(threadPool);
 		var connector = new ServerConnector(server);
-		connector.setPort(8080);
+		connector.setPort(configuration.getInt("web.port").orElse(8080));
 		server.setConnectors(new Connector[]{connector});
 
 		var servletHandler = new ServletHandler();

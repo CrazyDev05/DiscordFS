@@ -4,7 +4,6 @@ import club.minnced.discord.webhook.WebhookClient;
 import com.google.gson.JsonObject;
 import de.crazydev22.discordfs.Database;
 import de.crazydev22.discordfs.Main;
-import de.crazydev22.discordfs.streams.CountingOutputStream;
 import de.crazydev22.utils.IHandler;
 import de.crazydev22.utils.JsonConfiguration;
 import jakarta.servlet.WriteListener;
@@ -12,14 +11,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import org.eclipse.jetty.server.HttpChannel;
-import org.eclipse.jetty.server.HttpChannelState;
-import org.eclipse.jetty.server.Response;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Field;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -66,7 +61,7 @@ public abstract class IIHandler extends IHandler {
 	protected final void transferStreamAsync(@NotNull HttpServletRequest request, @NotNull HttpServletResponse response,
 											 @NotNull InputStream in, int status, int buffer) throws IOException {
 		var async = request.startAsync();
-		async.setTimeout(3*3600000);
+		async.setTimeout(6*3600000);
 		var out = response.getOutputStream();
 		out.setWriteListener(new WriteListener() {
 			private final byte[] buf = new byte[buffer];

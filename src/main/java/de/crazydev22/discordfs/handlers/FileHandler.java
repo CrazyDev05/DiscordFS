@@ -98,7 +98,7 @@ public class FileHandler extends IIHandler {
 	@Override
 	public void DELETE(@NotNull HttpServletRequest request, @NotNull HttpServletResponse response) throws Throwable {
 		DiscordFile file = getFile(request.getRequestURI());
-		if (file == null || !file.matchesToken(request.getHeader("Authorization"))) {
+		if (file == null || file.notMatchesToken(request.getHeader("Authorization"))) {
 			sendText(response, 404, "File not found");
 			return;
 		}

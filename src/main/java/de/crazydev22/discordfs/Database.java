@@ -1,98 +1,104 @@
 package de.crazydev22.discordfs;
 
-import lombok.SneakyThrows;
+import de.crazydev22.utils.Cache;
+import de.crazydev22.utils.container.Pair;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.mariadb.jdbc.MariaDbDataSource;
 
-import java.sql.SQLException;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Database {
-	private static final String URL = "jdbc:mariadb://%s:%s/%s";
-	private final MariaDbDataSource dataSource;
+	private final Cache<Pair<String, String>, DiscordFile> cache = new Cache<>(this::load, 1000, Duration.ofHours(3));
+	private final String minPath;
 
-	public Database(String host, int port, String database, String username, String password) throws SQLException {
-		dataSource = new MariaDbDataSource(URL.formatted(host, port, database));
-
-		dataSource.setUser(username);
-		dataSource.setPassword(password);
-
-		init();
-	}
-
-	private void init() throws SQLException {
-		try (var connection = dataSource.getConnection()) {
-			try (var stmt = connection.createStatement()){
-				stmt.setQueryTimeout(10);
-				stmt.executeUpdate("CREATE TABLE IF NOT EXISTS `files` (" +
-						"`id` VARCHAR(10) NOT NULL, " +
-						"`token` VARCHAR(20) NOT NULL, " +
-						"`name` VARCHAR(64) NOT NULL, " +
-						"`mime` TEXT NOT NULL, " +
-						"`data` JSON NOT NULL, " +
-						"PRIMARY KEY (`id`, `name`));");
-			}
-		}
+	public Database(@NotNull File storage) {
+		this.minPath = storage.getAbsolutePath() + File.separator;
 	}
 
 	@Nullable
 	public DiscordFile getFile(@NotNull String id, @NotNull String name) {
-		try (var connection = dataSource.getConnection();
-			 var stmt = connection.prepareStatement("SELECT * FROM files WHERE `id` = ? AND `name` = ? LIMIT 1")) {
-			stmt.setQueryTimeout(10);
-			stmt.setString(1, id);
-			stmt.setString(2, name);
-
-			var set = stmt.executeQuery();
-			if (!set.next())
-				return null;
-
-			return new DiscordFile(
-					set.getString("id"),
-					set.getString("token"),
-					set.getString("name"),
-					set.getString("mime"),
-					set.getString("data"));
-		} catch (SQLException e) {
-			throw new RuntimeException(e);
-		}
+		return cache.get(new Pair<>(id, name));
 	}
 
-	public void deleteFile(@NotNull String id, @NotNull String name, @NotNull String token) throws SQLException {
-		try (var connection = dataSource.getConnection();
-			 var stmt = connection.prepareStatement("DELETE FROM files WHERE `id` = ? AND `name` = ? AND `token` = ? LIMIT 1")) {
-			stmt.setQueryTimeout(10);
-			stmt.setString(1, id);
-			stmt.setString(2, name);
-			stmt.setString(3, token);
+	public void deleteFile(@NotNull String id, @NotNull String name, @NotNull String token) throws IOException {
+		DiscordFile discordFile = cache.get(new Pair<>(id, name));
+		if (discordFile == null) throw new FileNotFoundException("File not found");
+		if (discordFile.notMatchesToken(token)) throw new IllegalArgumentException("Invalid token");
+		File file = getFile0(id, name);
+		if (!file.delete()) throw new IOException("Could not delete file");
 
-			stmt.executeUpdate();
-		}
+		cache.invalidate(new Pair<>(id, name));
+		discordFile.getParts()
+				.stream()
+				.map(DiscordFile.Part::messageID)
+				.forEach(Main.getInstance().getWebhook()::delete);
 	}
 
-	public void saveFile(@NotNull DiscordFile file) throws SQLException {
-		var tmp = getFile(file.getId(), file.getName());
-		if (tmp != null) {
-			if (tmp.getToken().equals(file.getToken())) {
-				var client = Main.getInstance().getWebhook();
-				for (var part : tmp.getParts())
-					client.delete(part.messageID());
-				deleteFile(file.getId(), file.getName(), file.getToken());
-			} else {
-				return;
+	public void saveFile(@NotNull DiscordFile file) throws IOException {
+		File file0 = getFile0(file.getId(), file.getName());
+
+		try (DataOutputStream dos = new DataOutputStream(new FileOutputStream(file0))) {
+			dos.writeUTF(file.getToken());
+			dos.writeUTF(file.getMime());
+			dos.writeInt(file.getParts().size());
+			for (var part : file.getParts()) {
+				dos.writeLong(part.messageID());
+				dos.writeInt(part.ivs().size());
+				dos.writeInt(part.partSizes().size());
+				for (var iv : part.ivs())
+					dos.write(iv);
+				for (var size : part.partSizes())
+					dos.writeInt(size);
 			}
 		}
+    }
 
-		try (var connection = dataSource.getConnection();
-			 var stmt = connection.prepareStatement("INSERT INTO files (id, token, name, mime, data) VALUES (?,?,?,?,?)")) {
-			stmt.setQueryTimeout(10);
-			stmt.setString(1, file.getId());
-			stmt.setString(2, file.getToken());
-			stmt.setString(3, file.getName());
-			stmt.setString(4, file.getMime());
-			stmt.setString(5, Main.GSON.toJson(file.getParts()));
+	private File getFile0(String id, String name) {
+		if (!id.matches("^[a-zA-Z0-9]*$")) throw new IllegalArgumentException("Id contains invalid characters");
+		String basePath = this.minPath + id + File.separator;
+		File file = new File(basePath + name);
+		if (!file.getAbsolutePath().startsWith(basePath)) throw new IllegalArgumentException("Invalid file path");
+		if (!file.exists() || !file.isFile()) throw new IllegalArgumentException("File not found");
+		return file;
+	}
 
-			stmt.executeUpdate();
+	private DiscordFile load(Pair<String, String> pair) {
+		File file = getFile0(pair.getA(), pair.getB());
+		try (DataInputStream din = new DataInputStream(new FileInputStream(file))) {
+			String token = din.readUTF();
+			String mime = din.readUTF();
+			int partCount = din.readInt();
+			List<DiscordFile.Part> parts = new ArrayList<>(partCount);
+			for (int i = 0; i < partCount; i++) {
+				long messageID = din.readLong();
+				int ivsCount = din.readInt();
+				int sizeCount = din.readInt();
+				List<byte[]> ivs = new ArrayList<>(ivsCount);
+				List<Integer> sizes = new ArrayList<>(sizeCount);
+
+				for (int j = 0; j < ivsCount; j++) {
+					byte[] iv = new byte[16];
+					if (din.read(iv) != 16) throw new IOException("Invalid iv");
+					ivs.add(iv);
+				}
+
+				for (int j = 0; j < sizeCount; j++) {
+					sizes.add(din.readInt());
+				}
+				parts.add(new DiscordFile.Part(messageID, ivs, sizes));
+			}
+			return new DiscordFile(pair.getA(), token, pair.getB(), mime, parts);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
 		}
 	}
 }

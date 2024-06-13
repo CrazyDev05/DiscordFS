@@ -3,8 +3,6 @@ package de.crazydev22.discordfs;
 import club.minnced.discord.webhook.WebhookClient;
 import club.minnced.discord.webhook.receive.ReadonlyAttachment;
 import club.minnced.discord.webhook.receive.ReadonlyMessage;
-import com.google.gson.*;
-import com.google.gson.reflect.TypeToken;
 import de.crazydev22.discordfs.streams.DiscordFileInputStream;
 import de.crazydev22.discordfs.streams.LimitingInputStream;
 import de.crazydev22.utils.CipherUtil;
@@ -16,7 +14,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.InputStream;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -26,7 +23,6 @@ import java.util.concurrent.CompletableFuture;
 @Data
 @AllArgsConstructor
 public final class DiscordFile {
-	private static final Type LIST_TYPE = TypeToken.getParameterized(ArrayList.class, Part.class).getType();
 	private static final String OCTET_STREAM = "application/octet-stream";
 
 	private final @NotNull String id;
@@ -50,11 +46,6 @@ public final class DiscordFile {
 		return new DiscordFile(id, name, mime);
 	}
 
-	@SuppressWarnings("unchecked")
-	public DiscordFile(@NotNull String id, @NotNull String token, @NotNull String name, @NotNull String mime, @NotNull String data) {
-		this(id, token, name, mime, (List<Part>) Main.GSON.fromJson(data, LIST_TYPE));
-	}
-
 	public long getSize() {
 		long size = 0;
 		for (var part : parts)
@@ -62,8 +53,8 @@ public final class DiscordFile {
 		return size;
 	}
 
-	public boolean matchesToken(@Nullable String token) {
-		return token != null && token.length() > 7 && getToken().equals(token.substring(7));
+	public boolean notMatchesToken(@Nullable String token) {
+		return token == null || token.length() <= 7 || !getToken().equals(token.substring(7));
 	}
 
 	@SneakyThrows
@@ -133,29 +124,6 @@ public final class DiscordFile {
 					.sorted(Comparator.comparing(ReadonlyAttachment::getFileName))
 					.map(ReadonlyAttachment::getUrl)
 					.toList();
-		}
-
-		public static class Adapter implements JsonDeserializer<Part>, JsonSerializer<Part> {
-			private static final Type SIZES_TYPE = TypeToken.getParameterized(ArrayList.class, Integer.class).getType();
-			private static final Type IVS_TYPE = TypeToken.getParameterized(ArrayList.class, byte[].class).getType();
-
-			@Override
-			public Part deserialize(JsonElement element, Type type, JsonDeserializationContext context) throws JsonParseException {
-				JsonObject object = element.getAsJsonObject();
-				return new Part(
-						object.get("messageID").getAsLong(),
-						context.deserialize(object.get("ivs"), IVS_TYPE),
-						context.deserialize(object.get("sizes"), SIZES_TYPE));
-			}
-
-			@Override
-			public JsonElement serialize(Part part, Type type, JsonSerializationContext context) {
-				JsonObject object = new JsonObject();
-				object.addProperty("messageID", part.messageID);
-				object.add("ivs", context.serialize(part.ivs));
-				object.add("sizes", context.serialize(part.partSizes));
-				return object;
-			}
 		}
 	}
 }
