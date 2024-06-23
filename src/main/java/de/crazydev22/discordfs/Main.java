@@ -29,9 +29,11 @@ public class Main {
 	private static @Getter Main instance;
 
 	private final JsonConfiguration<JsonObject> configuration = new JsonConfiguration<>("config.json", JsonConfiguration.fromMap(
-			"storage", "files",
+			"storage", "data/files",
 			"cipher", "",
 			"webhook", "https://discord.com/api/webhooks/<>/<>",
+			"discord.maxFileSize", 10 * 1024 * 1024,
+			"discord.attachmentsPerFile", 2,
 			"web.minThreads", 1,
 			"web.maxThreads", Runtime.getRuntime().availableProcessors(),
 			"web.idleTimeout", 120,

@@ -36,5 +36,7 @@ build/
 
 ### Mac OS ###
 .DS_Store
-/config.json
+/config_.json
 /.gradle/
+/config.json
+/data/files/

@@ -12,8 +12,8 @@ import java.util.concurrent.Callable;
 
 @SuppressWarnings("unused")
 public class JsonUtil {
-	public static final Gson PRETTY_PRINT_GSON = new GsonBuilder().setPrettyPrinting().create();
-	public static final Gson NORMAL_GSON = new GsonBuilder().create();
+	public static final Gson PRETTY_PRINT_GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
+	public static final Gson NORMAL_GSON = new GsonBuilder().disableHtmlEscaping().create();
 
 	private final Gson gson;
 

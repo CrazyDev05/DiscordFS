@@ -15,6 +15,8 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 public class Database {
 	private final Cache<Pair<String, String>, DiscordFile> cache = new Cache<>(this::load, 1000, Duration.ofHours(3));
@@ -47,7 +49,7 @@ public class Database {
 		if (!file0.getParentFile().exists() && !file0.getParentFile().mkdirs())
 			throw new IOException("Could not create directory");
 
-		try (DataOutputStream dos = new DataOutputStream(new FileOutputStream(file0))) {
+		try (DataOutputStream dos = new DataOutputStream(new GZIPOutputStream(new FileOutputStream(file0)))) {
 			dos.writeUTF(file.getToken());
 			dos.writeUTF(file.getMime());
 			dos.writeInt(file.getParts().size());
@@ -77,7 +79,7 @@ public class Database {
 
 	private DiscordFile load(Pair<String, String> pair) {
 		File file = getFile0(pair.getA(), pair.getB(), true);
-		try (DataInputStream din = new DataInputStream(new FileInputStream(file))) {
+		try (DataInputStream din = new DataInputStream(new GZIPInputStream(new FileInputStream(file)))) {
 			String token = din.readUTF();
 			String mime = din.readUTF();
 			int partCount = din.readInt();

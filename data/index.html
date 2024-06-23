@@ -3,8 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <title>Title</title>
+    <style>
+        #loading-bar-spinner.spinner {
+            left: 50%;
+            margin-left: -20px;
+            top: 50%;
+            margin-top: -20px;
+            position: absolute;
+            z-index: 19 !important;
+            animation: loading-bar-spinner 400ms linear infinite;
+        }
+
+        #loading-bar-spinner.spinner .spinner-icon {
+            width: 40px;
+            height: 40px;
+            border:  solid 4px transparent;
+            border-top-color:  #00C8B1 !important;
+            border-left-color: #00C8B1 !important;
+            border-radius: 50%;
+        }
+
+        @keyframes loading-bar-spinner {
+            0%   { transform: rotate(0deg);}
+            100% { transform: rotate(360deg);}
+        }
+    </style>
 </head>
 <body>
-    Test
+    <form id="form_input">
+
+        <label for="path">Path</label>
+        <input type="text" name="path" id="path" />
+        <label for="id">ID</label>
+        <input type="text" name="id" id="id" />
+        <input type="file" name="file" id="file" />
+        <button type="submit">Enter</button>
+
+        <div id="outputDiv"></div>
+
+        <script>
+            document.getElementById('form_input').addEventListener('submit', function(event) {
+                event.preventDefault();
+
+                let fileInput = document.getElementById('file');
+                let file = fileInput.files[0];
+                let path = document.getElementById("path").value;
+                if (!path) path = "/" + file.name;
+                let id = document.getElementById("id").value;
+
+                if (file) {
+                    let outputDiv = document.getElementById("outputDiv");
+                    outputDiv.innerHTML = "<div id=\"loading-bar-spinner\" class=\"spinner\"><div class=\"spinner-icon\"></div></div>";
+
+                    new Promise((resolve, reject) => {
+                        let reader = new FileReader();
+
+                        reader.onload = async function(e) {
+                            let data = e.target.result;
+
+                            try {
+                                let headers = {"Content-Type": file.type}
+                                if (id) headers["file-id"] = id;
+
+                                let response = await fetch("/files" + path, {
+                                    method: "PUT",
+                                    headers: headers,
+                                    body: data
+                                });
+                                response = await response.json();
+                                resolve(response);
+                            } catch (error) {
+                                reject(error);
+                            }
+                        };
+
+                        reader.onerror = function(e) {
+                            reject(new Error("Error reading file"));
+                        };
+
+                        reader.readAsArrayBuffer(file);
+                    }).then(response => {
+                        outputDiv.innerHTML = "<pre>" + JSON.stringify(response, null, 4) + "</pre>";
+                    }).catch(error => {
+                        console.error("An error occurred:", error);
+                        outputDiv.innerHTML = "An error occurred during the upload.";
+                    });
+                } else {
+                    console.log('No file selected.');
+                }
+            });
+        </script>
+    </form>
 </body>
 </html>
